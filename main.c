@@ -1,6 +1,7 @@
 #include <u.h>
 #include <libc.h>
 #include <bio.h>
+#include <json.h>
 #include "fns.h"
 
 void
@@ -9,6 +10,7 @@ main(int argc, char **argv)
 	char *email;
 	char *password;
 	Biobuf *bin;
+	int r;
 
 	bin = Bfdopen(0, OREAD);
 
@@ -18,7 +20,15 @@ main(int argc, char **argv)
 	password = Brdstr(bin, '\n', 1);
 
 	login(email, password);
+	memset(password, '\0', strlen(password));
+	free(password);
+	free(email);
 
 	startfs();
-	readstream();
+	r = rfork(RFFDG|RFREND|RFPROC|RFMEM);
+	if (r < 0)
+		sysfatal("rfork: %r");
+	if (r == 0)
+		readstream();
+	exits(nil);
 }

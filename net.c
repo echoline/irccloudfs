@@ -2,10 +2,12 @@
 #include <libc.h>
 #include <json.h>
 #include <bio.h>
+#include "fns.h"
 
 char *session;
 char *token;
 unsigned long sinceid = -1;
+char running;
 
 #define URL "https://www.irccloud.com"
 #define AUTHURL URL "/chat/auth-formtoken"
@@ -140,7 +142,7 @@ login(char *username, char *password)
 	headers = calloc(2, sizeof(char*));
 	headers[0] = smprint("x-auth-formtoken: %s", token);
 
-	fd = openurl(LOGINURL, headers, 1, postdata, "application/x-www-form-urlencoded");
+	fd = openurl(LOGINURL, headers, 1, postdata, nil);
 	free(headers[0]);
 	free(headers);
 	free(postdata);
@@ -184,22 +186,14 @@ parsestream(JSON *json)
 		sysfatal("jsonbyname(type): %r");
 
 	if (strcmp(jsonm->s, "makeserver") == 0) {
-		jsonm = jsonbyname(json, "name");
-		if (jsonm == nil)
-			sysfatal("jsonbyname(name): %r");
-
-		print("%s\n", jsonm->s);
+		allocserver(json);
 	}
 	else if (strcmp(jsonm->s, "makebuffer") == 0) {
-		jsonm = jsonbyname(json, "buffer_type");
+		jsonm = jsonbyname(json, "archived");
 		if (jsonm == nil)
-			sysfatal("jsonbyname(buffer_type): %r");
-		if (strcmp(jsonm->s, "channel") == 0) {
-			jsonm = jsonbyname(json, "name");
-			if (jsonm == nil)
-				sysfatal("jsonbyname(name): %r");
-
-			print("\t%s\n", jsonm->s);
+			sysfatal("jsonbyname(archived): %r");
+		if (jsonm->n == 0) {
+			allocbuffer(json);
 		}
 	}
 }
@@ -263,7 +257,8 @@ readstream(void)
 
 	fd = openurl(STREAMURL, headers, 0, nil, nil);
 	stream = Bfdopen(fd, OREAD);
-	for(;;) {
+	running = 1;
+	while(running) {
 		buf = Brdline(stream, '\n');
 		if (buf == nil) {
 			close(fd);

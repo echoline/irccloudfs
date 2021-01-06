@@ -13,4 +13,4 @@ fs.$O: fs.c
 	$O^c fs.c
 
 clean:V:
-	rm *.$O irccloudfs
+	rm -f *.$O irccloudfs
