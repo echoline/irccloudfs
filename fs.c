@@ -5,28 +5,56 @@
 #include <9p.h>
 #include <json.h>
 #include "dat.h"
+#include "fns.h"
 
 extern char running;
 
-struct IRCServer {
-	unsigned long cid;
-	File *f;
-	struct IRCServer *next;
-};
 struct IRCServer *ircservers;
-
 struct Buffer *buffers;
 
 static void
 fsread(Req *r)
 {
+	File *f = r->fid->file;
+	struct Buffer *buffer;
+
+	if (strcmp(f->name, "data") == 0) {
+		buffer = f->aux;
+		readbuf(r, buffer->data, buffer->length);
+		respond(r, nil);
+		return;
+	}
+
 	respond(r, "no");
 }
 
 static void
 fswrite(Req *r)
 {
+	File *f = r->fid->file;
+	struct Buffer *buffer = f->aux;
+
+	if (strcmp(f->name, "data") == 0) {
+		if (strcmp(buffer->name, "*") != 0) {
+			say(buffer->server->cid, buffer->name, r->ifcall.data, r->ifcall.count);
+			r->ofcall.count = r->ifcall.count;
+			respond(r, nil);
+			return;
+		}
+	}
+
 	respond(r, "no");
+}
+
+static void
+fsstat(Req *r)
+{
+	File *f = r->fid->file;
+
+	if (strcmp(f->name, "data") == 0)
+		r->d.length = ((struct Buffer*)f->aux)->length;
+
+	respond(r, nil);
 }
 
 static void
@@ -38,6 +66,7 @@ fsend(Srv *s)
 Srv fssrv = {
 	.read = fsread,
 	.write = fswrite,
+	.stat = fsstat,
 	.end = fsend,
 };
 
@@ -155,8 +184,11 @@ allocbuffer(JSON *json)
 	buffer->deferred = deferred;
 	buffer->cid = cid;
 	buffer->bid = bid;
-	buffer->f = createfile(server->f, jsonm->s, nil, DMDIR|0777, nil);
+	buffer->name = strdup(jsonm->s);
+	buffer->server = server;
+	buffer->f = createfile(server->f, jsonm->s, nil, DMDIR|0777, server);
 	buffer->dataf = createfile(buffer->f, "data", nil, 0666, buffer);
+	buffer->data = malloc(1);
 }
 
 void

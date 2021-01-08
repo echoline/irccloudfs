@@ -21,6 +21,7 @@ extern struct Buffer *buffers;
 #define AUTHURL URL "/chat/auth-formtoken"
 #define LOGINURL URL "/chat/login"
 #define STREAMURL URL "/chat/stream"
+#define SAYURL URL "/chat/say"
 
 void readbacklog(char *path);
 
@@ -185,8 +186,10 @@ login(char *username, char *password)
 void
 parsestream(JSON *json)
 {
-	JSON *jsonm;
-	char *tmp;
+	JSON *jsonm, *jsonm2, *jsonm3;
+	unsigned long bid;
+	struct Buffer *buffer;
+	char *msg;
 
 	jsonm = jsonbyname(json, "eid");
 	if (jsonm != nil && jsonm->n > 0)
@@ -215,11 +218,34 @@ parsestream(JSON *json)
 	}
 	else if (strcmp(jsonm->s, "makebuffer") == 0) {
 		jsonm = jsonbyname(json, "archived");
-		if (jsonm == nil)
-			sysfatal("jsonbyname(archived): %r");
-		if (jsonm->n == 0) {
+		if (jsonm != nil && jsonm->n == 0) {
 			allocbuffer(json);
 		}
+	}
+	else if (strcmp(jsonm->s, "buffer_msg") == 0
+		|| strcmp(jsonm->s, "buffer_me_msg") == 0) {
+		jsonm3 = jsonbyname(json, "bid");
+		if (jsonm3 == nil)
+			sysfatal("jsonbyname(bid): %r");
+		bid = (unsigned long)jsonm3->n;
+		buffer = findbuffer(bid);
+		if (buffer == nil)
+			sysfatal("findbuffer: %r");
+		jsonm3 = jsonbyname(json, "from");
+		if (jsonm3 == nil)
+			sysfatal("jsonbyname(from): %r");
+		jsonm2 = jsonbyname(json, "msg");
+		if (jsonm2 == nil)
+			sysfatal("jsonbyname(msg): %r");
+		if (strcmp(jsonm->s, "buffer_msg") == 0)
+			msg = smprint("%s → %s\n", jsonm3->s, jsonm2->s);
+		else
+			msg = smprint("* %s %s\n", jsonm3->s, jsonm2->s);
+
+		buffer->data = realloc(buffer->data, buffer->length + strlen(msg));
+		memcpy(buffer->data + buffer->length, msg, strlen(msg));
+		buffer->length += strlen(msg);
+		free(msg);
 	}
 }
 
@@ -301,4 +327,30 @@ readstream(void)
 		jsonfree(json);
 		free(tmp);
 	}
+}
+
+void
+say(unsigned long cid, char *to, char *data, unsigned long count)
+{
+	char *postdata;
+	int fd;
+	char **headers = calloc(3, sizeof(char*));
+	char *msg = malloc(count+1);
+
+	memcpy(msg, data, count);
+	msg[count] = '\0';
+
+	postdata = smprint("cid=%d&to=%s&msg=%s&token=%s&session=%s", cid, to, msg, token, session);
+
+	headers[0] = smprint("x-auth-formtoken: %s", token);
+	headers[1] = smprint("Cookie: session=%s", session);
+
+	fd = openurl(SAYURL, headers, 1, postdata, nil);
+	close(fd);
+
+	free(msg);
+	free(postdata);
+	free(headers[0]);
+	free(headers[1]);
+	free(headers);
 }
