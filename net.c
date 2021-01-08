@@ -2,17 +2,27 @@
 #include <libc.h>
 #include <json.h>
 #include <bio.h>
+#include <thread.h>
+#include <fcall.h>
+#include <9p.h>
+#include "dat.h"
 #include "fns.h"
 
 char *session;
 char *token;
 unsigned long sinceid = -1;
 char running;
+char *streamid;
+char backlog = 0;
+
+extern struct Buffer *buffers;
 
 #define URL "https://www.irccloud.com"
 #define AUTHURL URL "/chat/auth-formtoken"
 #define LOGINURL URL "/chat/login"
 #define STREAMURL URL "/chat/stream"
+
+void readbacklog(char *path);
 
 int
 openurl(char *url, char **headers, int post, char *postdata, char *type)
@@ -90,13 +100,13 @@ readbody(int bodyfd)
 	char *buf;
 	int i, r;
 
-	buf = malloc(256);
+	buf = malloc(8192);
 	buf[0] = '\0';
 	i = 0;
-	while ((r = read(bodyfd, buf + i, 255)) > 0) {
+	while ((r = read(bodyfd, buf + i, 8192-1)) > 0) {
 		i += r;
 		buf[i] = '\0';
-		buf = realloc(buf, i + 256);
+		buf = realloc(buf, i + 8192);
 	}
 
 	if (r < 0)
@@ -176,16 +186,31 @@ void
 parsestream(JSON *json)
 {
 	JSON *jsonm;
+	char *tmp;
 
 	jsonm = jsonbyname(json, "eid");
-	if (jsonm != nil && jsonm->n != -1)
+	if (jsonm != nil && jsonm->n > 0)
 		sinceid = (unsigned long)jsonm->n;
 
 	jsonm = jsonbyname(json, "type");
 	if (jsonm == nil)
 		sysfatal("jsonbyname(type): %r");
 
-	if (strcmp(jsonm->s, "makeserver") == 0) {
+	if (strcmp(jsonm->s, "header") == 0) {
+		jsonm = jsonbyname(json, "streamid");
+		if (streamid != nil)
+			free(streamid);
+		streamid = strdup(jsonm->s);
+	}
+	else if (strcmp(jsonm->s, "oob_include") == 0) {
+		jsonm = jsonbyname(json, "url");
+		backlog = 1;
+		readbacklog(jsonm->s);
+	}
+	else if (strcmp(jsonm->s, "backlog_complete") == 0) {
+		backlog = 0;
+	}
+	else if (strcmp(jsonm->s, "makeserver") == 0) {
 		allocserver(json);
 	}
 	else if (strcmp(jsonm->s, "makebuffer") == 0) {
@@ -199,7 +224,7 @@ parsestream(JSON *json)
 }
 
 void
-readbacklog(char *path, char *streamid)
+readbacklog(char *path)
 {
 	char *url;
 	int fd;
@@ -207,34 +232,27 @@ readbacklog(char *path, char *streamid)
 	char *line;
 	char *tmp = nil;
 	char **headers;
-	char *postdata;
-	int l, o;
+	int l;
 	JSON *json;
+	JSONEl *next;
+	struct Buffer *buffer;
 
 	headers = calloc(2, sizeof(char*));
 	headers[0] = smprint("Cookie: session=%s", session);
-	postdata = smprint("streamid=%s", streamid);
 
 	url = smprint("%s%s\n", URL, path);
-	fd = openurl(url, headers, 0, postdata, nil);
-	stream = Bfdopen(fd, OREAD);
-	o = 0;
-	while((line = Brdline(stream, '\n')) != nil) {
-		l = Blinelen(stream);
-		tmp = malloc(l + 1);
-		memcpy(tmp, line, l);
-		tmp[l] = '\0';
-		json = jsonparse(tmp);
-		if (json == nil)
-			continue;
-		free(tmp);
-		parsestream(json);
-		jsonfree(json);
-	}
+	fd = openurl(url, headers, 0, nil, nil);
+	tmp = readbody(fd);
+	json = jsonparse(tmp);
+	if (json == nil)
+		sysfatal("jsonparse: %r");
+	free(tmp);
+	for (next = json->first; next != nil; next = next->next)
+		parsestream(next->val);
+	jsonfree(json);
 
 	free(headers[0]);
 	free(headers);
-	free(postdata);
 
 	free(url);
 }
@@ -250,7 +268,9 @@ readstream(void)
 	char *postdata;
 	int l;
 	Biobuf *stream;
-	char *streamid = nil;
+	streamid = nil;
+
+	JSONfmtinstall();
 
 	headers = calloc(2, sizeof(char*));
 	headers[0] = smprint("Cookie: session=%s", session);
@@ -276,19 +296,7 @@ readstream(void)
 		if (json == nil)
 			sysfatal("jsonparse: %r");
 
-		jsonm = jsonbyname(json, "type");
-		if (strcmp(jsonm->s, "header") == 0) {
-			jsonm = jsonbyname(json, "streamid");
-			if (streamid != nil)
-				free(streamid);
-			streamid = strdup(jsonm->s);
-		}
-		else if (strcmp(jsonm->s, "oob_include") == 0) {
-			jsonm = jsonbyname(json, "url");
-			readbacklog(jsonm->s, streamid);
-		}
-		else
-			parsestream(json);
+		parsestream(json);
 
 		jsonfree(json);
 		free(tmp);

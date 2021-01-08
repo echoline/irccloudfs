@@ -2,6 +2,10 @@
 #include <libc.h>
 #include <bio.h>
 #include <json.h>
+#include <thread.h>
+#include <fcall.h>
+#include <9p.h>
+#include "dat.h"
 #include "fns.h"
 
 void

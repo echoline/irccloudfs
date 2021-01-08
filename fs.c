@@ -4,6 +4,7 @@
 #include <fcall.h>
 #include <9p.h>
 #include <json.h>
+#include "dat.h"
 
 extern char running;
 
@@ -12,8 +13,9 @@ struct IRCServer {
 	File *f;
 	struct IRCServer *next;
 };
-
 struct IRCServer *ircservers;
+
+struct Buffer *buffers;
 
 static void
 fsread(Req *r)
@@ -74,33 +76,87 @@ allocserver(JSON *json)
 	cur->f = createfile(fssrv.tree->root, jsonm->s, nil, DMDIR|0777, nil);
 }
 
+struct Buffer*
+findbuffer(unsigned long bid)
+{
+	struct Buffer *buffer;
+
+	buffer = buffers;
+	while (buffer != nil) {
+		if (buffer->bid == bid)
+			return buffer;
+		buffer = buffer->next;
+	}
+
+	return nil;
+}
+
 void
 allocbuffer(JSON *json)
 {
 	JSON *jsonm;
 	unsigned long cid;
-	struct IRCServer *cur;
+	unsigned long bid;
+	struct IRCServer *server;
+	struct Buffer *buffer;
+	unsigned long timeout;
+	unsigned long deferred;
+
+	jsonm = jsonbyname(json, "timeout");
+	if (jsonm == nil)
+		sysfatal("allocbuffer: jsonbyname(timeout): %r");
+	timeout = (unsigned long)jsonm->n;
+
+	jsonm = jsonbyname(json, "deferred");
+	if (jsonm == nil)
+		sysfatal("allocbuffer: jsonbyname(deferred): %r");
+	deferred = (unsigned long)jsonm->n;
 
 	jsonm = jsonbyname(json, "cid");
 	if (jsonm == nil)
 		sysfatal("allocbuffer: jsonbyname(cid): %r");
 	cid = (unsigned long)jsonm->n;
 
+	jsonm = jsonbyname(json, "bid");
+	if (jsonm == nil)
+		sysfatal("allocbuffer: jsonbyname(bid): %r");
+	bid = (unsigned long)jsonm->n;
+
 	jsonm = jsonbyname(json, "name");
 	if (jsonm == nil)
-		sysfatal("allocbuffer: jsonbyname: %r");
+		sysfatal("allocbuffer: jsonbyname(name): %r");
 
-	cur = ircservers;
-	while(cur != nil) {
-		if (cur->cid == cid)
+	server = ircservers;
+	while(server != nil) {
+		if (server->cid == cid)
 			break;
-		cur = cur->next;
+		server = server->next;
 	}
 
-	if (cur == nil)
+	if (server == nil)
 		sysfatal("allocbuffer: server not found");
 
-	createfile(cur->f, jsonm->s, nil, DMDIR|0777, nil);
+	if (buffers == nil) {
+		buffers = calloc(1, sizeof(struct Buffer));
+		buffer = buffers;
+	} else {
+		buffer = buffers;
+		while (buffer->next != nil) {
+			if (buffer->bid == bid)
+				return;
+			buffer = buffer->next;
+		}
+
+		buffer->next = calloc(1, sizeof(struct Buffer));
+		buffer = buffer->next;
+	}
+
+	buffer->timeout = timeout;
+	buffer->deferred = deferred;
+	buffer->cid = cid;
+	buffer->bid = bid;
+	buffer->f = createfile(server->f, jsonm->s, nil, DMDIR|0777, nil);
+	buffer->dataf = createfile(buffer->f, "data", nil, 0666, buffer);
 }
 
 void
@@ -109,6 +165,7 @@ startfs(void)
 	char *srvname = smprint("irccloud.%d", getpid());
 
 	ircservers = nil;
+	buffers = nil;
 
 	fssrv.tree = alloctree(nil, nil, DMDIR|0777, nil);
 	postmountsrv(&fssrv, srvname, "/n/irccloud", 0);
