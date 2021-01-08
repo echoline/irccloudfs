@@ -128,18 +128,16 @@ allocbuffer(JSON *json)
 	unsigned long bid;
 	struct IRCServer *server;
 	struct Buffer *buffer;
-	unsigned long timeout;
-	unsigned long deferred;
+	unsigned long timeout = 0;
+	unsigned long deferred = 0;
 
 	jsonm = jsonbyname(json, "timeout");
-	if (jsonm == nil)
-		sysfatal("allocbuffer: jsonbyname(timeout): %r");
-	timeout = (unsigned long)jsonm->n;
+	if (jsonm != nil)
+		timeout = (unsigned long)jsonm->n;
 
 	jsonm = jsonbyname(json, "deferred");
-	if (jsonm == nil)
-		sysfatal("allocbuffer: jsonbyname(deferred): %r");
-	deferred = (unsigned long)jsonm->n;
+	if (jsonm != nil)
+		deferred = (unsigned long)jsonm->n;
 
 	jsonm = jsonbyname(json, "cid");
 	if (jsonm == nil)
