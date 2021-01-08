@@ -16,13 +16,40 @@ static void
 fsread(Req *r)
 {
 	File *f = r->fid->file;
-	struct Buffer *buffer;
+	struct Buffer *buffer = f->aux;
+	char *buf = nil;
+	unsigned long blen = 0;
+	char *tmp;
+	unsigned long len;
+	struct User *members;
 
 	if (strcmp(f->name, "data") == 0) {
-		buffer = f->aux;
 		readbuf(r, buffer->data, buffer->length);
 		respond(r, nil);
 		return;
+	}
+	else if (strcmp(f->name, "topic") == 0
+		&& strcmp(buffer->type, "channel") == 0) {
+		readstr(r, buffer->topic);
+		respond(r, nil);
+		return;
+	}
+	else if (strcmp(f->name, "members") == 0
+		&& strcmp(buffer->type, "channel") == 0) {
+		for (members = buffer->members; members != nil; members = members->next) {
+			tmp = smprint("%s (%s) %s\n", members->nick, members->realname, members->mode);
+			len = strlen(tmp);
+			buf = realloc(buf, blen + len);
+			memcpy(buf + blen, tmp, len);
+			blen += len;
+			free(tmp);
+		}
+		if (buf != nil) {
+			readbuf(r, buf, blen);
+			respond(r, nil);
+			free(buf);
+			return;
+		}
 	}
 
 	respond(r, "no");
@@ -129,6 +156,7 @@ allocbuffer(JSON *json)
 	struct Buffer *buffer;
 	unsigned long timeout = 0;
 	unsigned long deferred = 0;
+	char *type;
 
 	jsonm = jsonbyname(json, "timeout");
 	if (jsonm != nil)
@@ -147,6 +175,11 @@ allocbuffer(JSON *json)
 	if (jsonm == nil)
 		sysfatal("allocbuffer: jsonbyname(bid): %r");
 	bid = (unsigned long)jsonm->n;
+
+	jsonm = jsonbyname(json, "buffer_type");
+	if (jsonm == nil)
+		sysfatal("allocbuffer: jsonbyname(buffer_type): %r");
+	type = jsonm->s;
 
 	jsonm = jsonbyname(json, "name");
 	if (jsonm == nil)
@@ -181,11 +214,16 @@ allocbuffer(JSON *json)
 	buffer->deferred = deferred;
 	buffer->cid = cid;
 	buffer->bid = bid;
+	buffer->type = strdup(type);
 	buffer->name = strdup(jsonm->s);
 	buffer->server = server;
 	buffer->f = createfile(server->f, jsonm->s, nil, DMDIR|0777, server);
 	buffer->dataf = createfile(buffer->f, "data", nil, 0666, buffer);
 	buffer->data = malloc(1);
+	if (strcmp(type, "channel") == 0) {
+		buffer->topicf = createfile(buffer->f, "topic", nil, 0444, buffer);
+		buffer->membersf = createfile(buffer->f, "members", nil, 0444, buffer);
+	}
 }
 
 void

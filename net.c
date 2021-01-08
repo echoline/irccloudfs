@@ -186,9 +186,11 @@ login(char *username, char *password)
 void
 parsestream(JSON *json)
 {
-	JSON *jsonm, *jsonm2, *jsonm3;
+	JSON *jsonm, *jsonm2, *jsonm3, *jsonm4, *jsonm5;
+	JSONEl *next;
 	unsigned long bid;
 	struct Buffer *buffer;
+	struct User *user, *members;
 	char *msg;
 
 	jsonm = jsonbyname(json, "eid");
@@ -233,8 +235,11 @@ parsestream(JSON *json)
 		if (buffer == nil)
 			sysfatal("findbuffer: %r");
 		jsonm3 = jsonbyname(json, "from");
-		if (jsonm3 == nil)
-			sysfatal("jsonbyname(from): %r");
+		if (jsonm3 == nil) {
+			jsonm3 = jsonbyname(json, "target");
+			if (jsonm3 == nil)
+				sysfatal("jsonbyname(target): %r");
+		}
 		jsonm2 = jsonbyname(json, "msg");
 		if (jsonm2 == nil)
 			sysfatal("jsonbyname(msg): %r");
@@ -249,6 +254,73 @@ parsestream(JSON *json)
 		memcpy(buffer->data + buffer->length, msg, strlen(msg));
 		buffer->length += strlen(msg);
 		free(msg);
+	}
+	else if (strcmp(jsonm->s, "channel_init") == 0) {
+		jsonm = jsonbyname(json, "bid");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(bid): %r");
+		bid = (unsigned long)jsonm->n;
+		buffer = findbuffer(bid);
+		if (buffer == nil)
+			sysfatal("findbuffer: %r");
+
+		jsonm = jsonbyname(json, "mode");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(mode): %r");
+		if (buffer->mode != nil)
+			free(buffer->mode);
+		buffer->mode = strdup(jsonm->s);
+
+		jsonm2 = jsonbyname(json, "topic");
+		if (jsonm2 == nil)
+			sysfatal("jsonbyname(topic): %r");
+		jsonm3 = jsonbyname(jsonm2, "time");
+		if (jsonm3 == nil)
+			sysfatal("jsonbyname(time): %r");
+		jsonm4 = jsonbyname(jsonm2, "nick");
+		if (jsonm4 == nil)
+			sysfatal("jsonbyname(nick): %r");
+		jsonm5 = jsonbyname(jsonm2, "text");
+		if (jsonm5 == nil)
+			sysfatal("jsonbyname(text): %r");
+		if (buffer->topic != nil)
+			free(buffer->topic);
+		buffer->topic = smprint("%s: %s\ntopic set at %d by %s:\n%s\n", buffer->name, buffer->mode, (unsigned long)jsonm3->n, jsonm4->s, jsonm5->s);
+
+		jsonm2 = jsonbyname(json, "members");
+		if (jsonm2 == nil)
+			sysfatal("jsonbyname(members): %r");
+
+		members = buffer->members;
+		for(next = jsonm2->first; next != nil; next = next->next) {
+			jsonm2 = next->val;
+
+			jsonm3 = jsonbyname(jsonm2, "nick");
+			if (jsonm3 == nil)
+				sysfatal("jsonbyname(nick): %r");
+
+			for(user = members; user != nil; user = user->next)
+				if (strcmp(user->nick, jsonm3->s) == 0)
+					break;
+			if (user != nil)
+				continue;
+
+			jsonm4 = jsonbyname(jsonm2, "realname");
+			if (jsonm4 == nil)
+				sysfatal("jsonbyname(realname): %r");
+
+			jsonm5 = jsonbyname(jsonm2, "mode");
+			if (jsonm5 == nil)
+				sysfatal("jsonbyname(mode): %r");
+
+			user = calloc(1, sizeof(struct User));
+			user->nick = strdup(jsonm3->s);
+			user->realname = strdup(jsonm4->s == nil? "<nil>": jsonm4->s);
+			user->mode = strdup(jsonm5->s);
+			user->next = members;
+			members = user;
+		}
+		buffer->members = members;
 	}
 }
 
