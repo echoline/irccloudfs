@@ -35,12 +35,10 @@ fswrite(Req *r)
 	struct Buffer *buffer = f->aux;
 
 	if (strcmp(f->name, "data") == 0) {
-		if (strcmp(buffer->name, "*") != 0) {
-			say(buffer->server->cid, buffer->name, r->ifcall.data, r->ifcall.count);
-			r->ofcall.count = r->ifcall.count;
-			respond(r, nil);
-			return;
-		}
+		say(buffer->server->cid, buffer->name, r->ifcall.data, r->ifcall.count);
+		r->ofcall.count = r->ifcall.count;
+		respond(r, nil);
+		return;
 	}
 
 	respond(r, "no");
