@@ -218,7 +218,7 @@ parsestream(JSON *json)
 	}
 	else if (strcmp(jsonm->s, "makebuffer") == 0) {
 		jsonm = jsonbyname(json, "archived");
-		if (jsonm != nil && jsonm->n == 0) {
+		if (jsonm == nil || jsonm->n == 0) {
 			allocbuffer(json);
 		}
 	}
