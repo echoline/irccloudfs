@@ -223,7 +223,8 @@ parsestream(JSON *json)
 		}
 	}
 	else if (strcmp(jsonm->s, "buffer_msg") == 0
-		|| strcmp(jsonm->s, "buffer_me_msg") == 0) {
+		|| strcmp(jsonm->s, "buffer_me_msg") == 0
+		|| strcmp(jsonm->s, "notice") == 0) {
 		jsonm3 = jsonbyname(json, "bid");
 		if (jsonm3 == nil)
 			sysfatal("jsonbyname(bid): %r");
@@ -239,6 +240,8 @@ parsestream(JSON *json)
 			sysfatal("jsonbyname(msg): %r");
 		if (strcmp(jsonm->s, "buffer_msg") == 0)
 			msg = smprint("%s → %s\n", jsonm3->s, jsonm2->s);
+		else if (strcmp(jsonm->s, "notice") == 0)
+			msg = smprint("NOTICE %s → %s\n", jsonm3->s, jsonm2->s);
 		else
 			msg = smprint("* %s %s\n", jsonm3->s, jsonm2->s);
 
