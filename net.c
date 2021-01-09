@@ -61,6 +61,10 @@ openurl(char *url, char **headers, int post, char *postdata, char *type)
 		}
 	}
 
+	r = strlen("useragent irccloudfs");
+	if (write(clonefd, "useragent irccloudfs", r) != r)
+		sysfatal("write clonefd useragent: %r");
+
 	if (post) {
 		r = strlen("request POST");
 		if (write(clonefd, "request POST", r) != r)
