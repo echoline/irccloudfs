@@ -289,7 +289,7 @@ parsestream(JSON *json)
 			sysfatal("jsonbyname(text): %r");
 		if (buffer->topic != nil)
 			free(buffer->topic);
-		buffer->topic = smprint("%s: %s\ntopic set at %d by %s:\n%s\n", buffer->name, buffer->mode, (unsigned long)jsonm3->n, jsonm4->s, jsonm5->s);
+		buffer->topic = smprint("%s %c%s\ntopic set at %d by %s:\n%s\n", buffer->name, buffer->mode[0] == '\0'? ' ': '+', buffer->mode, (unsigned long)jsonm3->n, jsonm4->s, jsonm5->s);
 
 		jsonm2 = jsonbyname(json, "members");
 		if (jsonm2 == nil)
@@ -303,28 +303,140 @@ parsestream(JSON *json)
 			if (jsonm3 == nil)
 				sysfatal("jsonbyname(nick): %r");
 
-			for(user = members; user != nil; user = user->next)
-				if (strcmp(user->nick, jsonm3->s) == 0)
-					break;
-			if (user != nil)
-				continue;
-
-			jsonm4 = jsonbyname(jsonm2, "realname");
-			if (jsonm4 == nil)
-				sysfatal("jsonbyname(realname): %r");
-
 			jsonm5 = jsonbyname(jsonm2, "mode");
 			if (jsonm5 == nil)
 				sysfatal("jsonbyname(mode): %r");
 
+			for(user = members; user != nil; user = user->next)
+				if (strcmp(user->nick, jsonm3->s) == 0) {
+					free(user->mode);
+						user->mode = strdup(jsonm5->s);
+					break;
+				}
+			if (user != nil)
+				continue;
+
 			user = calloc(1, sizeof(struct User));
 			user->nick = strdup(jsonm3->s);
-			user->realname = strdup(jsonm4->s == nil? "<nil>": jsonm4->s);
 			user->mode = strdup(jsonm5->s);
 			user->next = members;
 			members = user;
 		}
 		buffer->members = members;
+	} else if (strcmp(jsonm->s, "joined_channel") == 0) {
+		jsonm = jsonbyname(json, "bid");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(bid): %r");
+		bid = (unsigned long)jsonm->n;
+		buffer = findbuffer(bid);
+		if (buffer == nil)
+			sysfatal("findbuffer: %r");
+
+		jsonm = jsonbyname(json, "nick");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(nick): %r");
+
+		jsonm2 = jsonbyname(json, "chan");
+		if (jsonm2 == nil)
+			sysfatal("jsonbyname(chan): %r");
+
+		for (members = buffer->members; members != nil; members = members->next)
+			if (strcmp(jsonm->s, members->nick) == 0)
+				break;
+
+		if (members == nil) {
+			user = calloc(1, sizeof(struct User));
+			user->nick = strdup(jsonm->s);
+			user->mode = calloc(1, sizeof(char));
+			user->next = buffer->members;
+			buffer->members = user;
+		}
+
+		msg = smprint("JOIN %s to %s\n", jsonm->s, jsonm2->s);
+		buffer->data = realloc(buffer->data, buffer->length + strlen(msg));
+		memcpy(buffer->data + buffer->length, msg, strlen(msg));
+		buffer->length += strlen(msg);
+		free(msg);
+	} else if (strcmp(jsonm->s, "parted_channel") == 0) {
+		jsonm = jsonbyname(json, "bid");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(bid): %r");
+		bid = (unsigned long)jsonm->n;
+		buffer = findbuffer(bid);
+		if (buffer == nil)
+			sysfatal("findbuffer: %r");
+
+		jsonm = jsonbyname(json, "nick");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(nick): %r");
+
+		jsonm2 = jsonbyname(json, "chan");
+		if (jsonm2 == nil)
+			sysfatal("jsonbyname(chan): %r");
+
+		if (buffer->members != nil) {
+			if (strcmp(jsonm->s, buffer->members->nick) == 0) {
+				free(buffer->members->nick);
+				free(buffer->members->mode);
+				members = buffer->members->next;
+				free(buffer->members);
+				buffer->members = members;
+			} else for (members = buffer->members->next, user = buffer->members; members != nil; user = members, members = members->next) {
+				if (strcmp(jsonm->s, members->nick) == 0) {
+					free(members->nick);
+					free(members->mode);
+					user->next = members->next;
+					free(members);
+				}
+			}
+		}
+
+		msg = smprint("PART %s from %s\n", jsonm->s, jsonm2->s);
+		buffer->data = realloc(buffer->data, buffer->length + strlen(msg));
+		memcpy(buffer->data + buffer->length, msg, strlen(msg));
+		buffer->length += strlen(msg);
+		free(msg);
+	} else if (strcmp(jsonm->s, "quit") == 0) {
+		jsonm = jsonbyname(json, "bid");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(bid): %r");
+		bid = (unsigned long)jsonm->n;
+		buffer = findbuffer(bid);
+		if (buffer == nil)
+			sysfatal("findbuffer: %r");
+
+		jsonm = jsonbyname(json, "nick");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(nick): %r");
+
+		jsonm2 = jsonbyname(json, "msg");
+		if (jsonm2 == nil)
+			sysfatal("jsonbyname(msg): %r");
+
+		if (buffer->members != nil) {
+			if (strcmp(jsonm->s, buffer->members->nick) == 0) {
+				free(buffer->members->nick);
+				free(buffer->members->mode);
+				members = buffer->members->next;
+				free(buffer->members);
+				buffer->members = members;
+			} else for (members = buffer->members->next, user = buffer->members; members != nil; user = members, members = members->next) {
+				if (strcmp(jsonm->s, members->nick) == 0) {
+					free(members->nick);
+					free(members->mode);
+					user->next = members->next;
+					free(members);
+				}
+			}
+		}
+
+		msg = smprint("QUIT %s - %s\n", jsonm->s, jsonm2->s);
+		buffer->data = realloc(buffer->data, buffer->length + strlen(msg));
+		memcpy(buffer->data + buffer->length, msg, strlen(msg));
+		buffer->length += strlen(msg);
+		free(msg);
+//	} else {
+//		print("%s ", jsonm->s);
 	}
 }
 
@@ -370,7 +482,6 @@ readstream(void)
 	int fd;
 	char **headers;
 	char *tmp;
-	char *postdata;
 	int l;
 	Biobuf *stream;
 	streamid = nil;
@@ -387,9 +498,7 @@ readstream(void)
 		buf = Brdline(stream, '\n');
 		if (buf == nil) {
 			close(fd);
-			postdata = smprint("since_id=%s&stream_id=%s", sinceid, streamid);
-			fd = openurl(STREAMURL, headers, 1, postdata, nil);
-			free(postdata);
+			fd = openurl(STREAMURL, headers, 0, nil, nil);
 			Binit(stream, fd, OREAD);
 			continue;
 		}

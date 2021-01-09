@@ -37,7 +37,7 @@ fsread(Req *r)
 	else if (strcmp(f->name, "members") == 0
 		&& strcmp(buffer->type, "channel") == 0) {
 		for (members = buffer->members; members != nil; members = members->next) {
-			tmp = smprint("%s (%s) %s\n", members->nick, members->realname, members->mode);
+			tmp = smprint("%s %c%s\n", members->nick, members->mode[0] != '\0'? '+': ' ', members->mode);
 			len = strlen(tmp);
 			buf = realloc(buf, blen + len);
 			memcpy(buf + blen, tmp, len);
