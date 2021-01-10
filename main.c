@@ -29,7 +29,7 @@ main(int argc, char **argv)
 	free(email);
 
 	startfs();
-	r = rfork(RFFDG|RFREND|RFPROC|RFMEM);
+	r = rfork(RFFDG|RFREND|RFPROC|RFMEM|RFNOTEG|RFNOWAIT);
 	if (r < 0)
 		sysfatal("rfork: %r");
 	if (r == 0)
