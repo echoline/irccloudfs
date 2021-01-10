@@ -512,7 +512,7 @@ parsestream(JSON *json)
 				free(members->nick);
 				members->nick = strdup(jsonm2->s);
 				break;
-			}	
+			}
 		}
 
 		if (strcmp(buffer->name, jsonm->s) == 0) {
@@ -525,8 +525,108 @@ parsestream(JSON *json)
 		memcpy(buffer->data + buffer->length, msg, strlen(msg));
 		buffer->length += strlen(msg);
 		free(msg);
+	} else if (strcmp(jsonm->s, "motd_response") == 0) {
+		jsonm = jsonbyname(json, "bid");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(bid): %r");
+		bid = (unsigned long)jsonm->n;
+		buffer = findbuffer(bid);
+		if (buffer == nil)
+			return;
+
+		jsonm = jsonbyname(json, "start");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(start): %r");
+
+		msg = smprint("%s\n", jsonm->s);
+		buffer->data = realloc(buffer->data, buffer->length + strlen(msg));
+		memcpy(buffer->data + buffer->length, msg, strlen(msg));
+		buffer->length += strlen(msg);
+		free(msg);
+
+		jsonm = jsonbyname(json, "lines");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(lines): %r");
+
+		for (next = jsonm->first; next != nil; next = next->next) {
+			msg = smprint("%s\n", next->val->s);
+			buffer->data = realloc(buffer->data, buffer->length + strlen(msg));
+			memcpy(buffer->data + buffer->length, msg, strlen(msg));
+			buffer->length += strlen(msg);
+			free(msg);
+		}
+
+		jsonm = jsonbyname(json, "msg");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(msg): %r");
+
+		msg = smprint("%s\n", jsonm->s);
+		buffer->data = realloc(buffer->data, buffer->length + strlen(msg));
+		memcpy(buffer->data + buffer->length, msg, strlen(msg));
+		buffer->length += strlen(msg);
+		free(msg);
+	} else if (strcmp(jsonm->s, "wallops") == 0) {
+		jsonm = jsonbyname(json, "bid");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(bid): %r");
+		bid = (unsigned long)jsonm->n;
+		buffer = findbuffer(bid);
+		if (buffer == nil)
+			return;
+
+		jsonm = jsonbyname(json, "from");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(from): %r");
+
+		jsonm2 = jsonbyname(json, "msg");
+		if (jsonm2 == nil)
+			sysfatal("jsonbyname(msg): %r");
+
+		msg = smprint("[%s] %s\n", jsonm->s, jsonm2->s);
+		buffer->data = realloc(buffer->data, buffer->length + strlen(msg));
+		memcpy(buffer->data + buffer->length, msg, strlen(msg));
+		buffer->length += strlen(msg);
+		free(msg);
+	} else if (strcmp(jsonm->s, "user_channel_mode") == 0) {
+		jsonm = jsonbyname(json, "bid");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(bid): %r");
+		bid = (unsigned long)jsonm->n;
+		buffer = findbuffer(bid);
+		if (buffer == nil)
+			return;
+
+		jsonm = jsonbyname(json, "nick");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(nick): %r");
+
+		jsonm2 = jsonbyname(json, "newmode");
+		if (jsonm2 == nil)
+			sysfatal("jsonbyname(newmode): %r");
+
+		jsonm3 = jsonbyname(json, "diff");
+		if (jsonm3 == nil)
+			sysfatal("jsonbyname(diff): %r");
+
+		jsonm4 = jsonbyname(json, "channel");
+		if (jsonm4 == nil)
+			sysfatal("jsonbyname(channel): %r");
+
+		for (members = buffer->members; members != nil; members = members->next) {
+			if (strcmp(jsonm->s, members->nick) == 0) {
+				free(members->mode);
+				members->mode = strdup(jsonm2->s);
+				break;
+			}
+		}
+
+		msg = smprint("MODE %s %s %s\n", jsonm4->s, jsonm3->s, jsonm->s);
+		buffer->data = realloc(buffer->data, buffer->length + strlen(msg));
+		memcpy(buffer->data + buffer->length, msg, strlen(msg));
+		buffer->length += strlen(msg);
+		free(msg);
 	} else {
-		print("%s ", jsonm->s);
+		print("%J\n", json);
 	}
 }
 
