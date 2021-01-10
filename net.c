@@ -241,7 +241,7 @@ parsestream(JSON *json)
 		bid = (unsigned long)jsonm3->n;
 		buffer = findbuffer(bid);
 		if (buffer == nil)
-			sysfatal("findbuffer: %r");
+			return;
 		jsonm3 = jsonbyname(json, "from");
 		if (jsonm3 == nil) {
 			jsonm3 = jsonbyname(json, "target");
@@ -270,7 +270,7 @@ parsestream(JSON *json)
 		bid = (unsigned long)jsonm->n;
 		buffer = findbuffer(bid);
 		if (buffer == nil)
-			sysfatal("findbuffer: %r");
+			return;
 
 		jsonm = jsonbyname(json, "mode");
 		if (jsonm == nil)
@@ -327,14 +327,15 @@ parsestream(JSON *json)
 			members = user;
 		}
 		buffer->members = members;
-	} else if (strcmp(jsonm->s, "joined_channel") == 0) {
+	} else if (strcmp(jsonm->s, "joined_channel") == 0
+		|| strcmp(jsonm->s, "you_joined_channel") == 0) {
 		jsonm = jsonbyname(json, "bid");
 		if (jsonm == nil)
 			sysfatal("jsonbyname(bid): %r");
 		bid = (unsigned long)jsonm->n;
 		buffer = findbuffer(bid);
 		if (buffer == nil)
-			sysfatal("findbuffer: %r");
+			return;
 
 		jsonm = jsonbyname(json, "nick");
 		if (jsonm == nil)
@@ -361,14 +362,15 @@ parsestream(JSON *json)
 		memcpy(buffer->data + buffer->length, msg, strlen(msg));
 		buffer->length += strlen(msg);
 		free(msg);
-	} else if (strcmp(jsonm->s, "parted_channel") == 0) {
+	} else if (strcmp(jsonm->s, "parted_channel") == 0
+		|| strcmp(jsonm->s, "you_parted_channel") == 0) {
 		jsonm = jsonbyname(json, "bid");
 		if (jsonm == nil)
 			sysfatal("jsonbyname(bid): %r");
 		bid = (unsigned long)jsonm->n;
 		buffer = findbuffer(bid);
 		if (buffer == nil)
-			sysfatal("findbuffer: %r");
+			return;
 
 		jsonm = jsonbyname(json, "nick");
 		if (jsonm == nil)
@@ -400,14 +402,15 @@ parsestream(JSON *json)
 		memcpy(buffer->data + buffer->length, msg, strlen(msg));
 		buffer->length += strlen(msg);
 		free(msg);
-	} else if (strcmp(jsonm->s, "kicked_channel") == 0) {
+	} else if (strcmp(jsonm->s, "kicked_channel") == 0
+		|| strcmp(jsonm->s, "you_kicked_channel") == 0) {
 		jsonm = jsonbyname(json, "bid");
 		if (jsonm == nil)
 			sysfatal("jsonbyname(bid): %r");
 		bid = (unsigned long)jsonm->n;
 		buffer = findbuffer(bid);
 		if (buffer == nil)
-			sysfatal("findbuffer: %r");
+			return;
 
 		jsonm = jsonbyname(json, "nick");
 		if (jsonm == nil)
@@ -454,7 +457,7 @@ parsestream(JSON *json)
 		bid = (unsigned long)jsonm->n;
 		buffer = findbuffer(bid);
 		if (buffer == nil)
-			sysfatal("findbuffer: %r");
+			return;
 
 		jsonm = jsonbyname(json, "nick");
 		if (jsonm == nil)
@@ -482,6 +485,42 @@ parsestream(JSON *json)
 		}
 
 		msg = smprint("QUIT %s - %s\n", jsonm->s, jsonm2->s);
+		buffer->data = realloc(buffer->data, buffer->length + strlen(msg));
+		memcpy(buffer->data + buffer->length, msg, strlen(msg));
+		buffer->length += strlen(msg);
+		free(msg);
+	} else if (strcmp(jsonm->s, "nickchange") == 0
+		|| strcmp(jsonm->s, "you_nickchange") == 0) {
+		jsonm = jsonbyname(json, "bid");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(bid): %r");
+		bid = (unsigned long)jsonm->n;
+		buffer = findbuffer(bid);
+		if (buffer == nil)
+			return;
+
+		jsonm = jsonbyname(json, "oldnick");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(oldnick): %r");
+
+		jsonm2 = jsonbyname(json, "newnick");
+		if (jsonm2 == nil)
+			sysfatal("jsonbyname(newnick): %r");
+
+		for (members = buffer->members; members != nil; members = members->next) {
+			if (strcmp(jsonm->s, members->nick) == 0) {
+				free(members->nick);
+				members->nick = strdup(jsonm2->s);
+				break;
+			}	
+		}
+
+		if (strcmp(buffer->name, jsonm->s) == 0) {
+			free(buffer->f->name);
+			buffer->f->name = strdup(jsonm->s);
+		}
+
+		msg = smprint("NICK %s → %s\n", jsonm->s, jsonm2->s);
 		buffer->data = realloc(buffer->data, buffer->length + strlen(msg));
 		memcpy(buffer->data + buffer->length, msg, strlen(msg));
 		buffer->length += strlen(msg);
@@ -566,8 +605,6 @@ readstream(void)
 		jsonfree(json);
 		free(tmp);
 	}
-
-	print("running = %d\n", running);
 }
 
 void
