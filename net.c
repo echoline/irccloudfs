@@ -277,7 +277,7 @@ parsestream(JSON *json)
 			memcpy(buffers->data + buffers->length, msg, strlen(msg));
 			buffers->length += strlen(msg);
 		}
-		else if (strcmp(server->nick, jsonm3->s) != 0 && strstr(server->nick, jsonm2->s) != nil) {
+		else if (strcmp(server->nick, jsonm3->s) != 0 && strstr(jsonm2->s, server->nick) != nil) {
 			buffers->data = realloc(buffers->data, buffers->length + strlen(buffer->name));
 			memcpy(buffers->data + buffers->length, buffer->name, strlen(buffer->name));
 			buffers->length += strlen(buffer->name);
