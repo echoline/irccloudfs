@@ -272,7 +272,7 @@ parsestream(JSON *json)
 		memcpy(buffer->data + buffer->length, msg, strlen(msg));
 		buffer->length += strlen(msg);
 
-		if (strcmp(buffer->type, "conversation") == 0) {
+		if (strcmp(buffer->type, "conversation") == 0 && strcmp(server->nick, jsonm3->s) != 0) {
 			buffers->data = realloc(buffers->data, buffers->length + strlen(msg));
 			memcpy(buffers->data + buffers->length, msg, strlen(msg));
 			buffers->length += strlen(msg);
@@ -754,7 +754,11 @@ say(unsigned long cid, char *to, char *data, unsigned long count)
 	char *postdata;
 	int fd;
 	char **headers = calloc(3, sizeof(char*));
-	char *tok = strtok(data, "\r\n");
+	char *msg = calloc(1, count + 1);
+	char *tok;
+
+	strncpy(msg, data, count);
+	tok = strtok(msg, "\r\n");
 
 	headers[0] = smprint("x-auth-formtoken: %s", token);
 	headers[1] = smprint("Cookie: session=%s", session);
@@ -774,6 +778,7 @@ say(unsigned long cid, char *to, char *data, unsigned long count)
 		tok = strtok(nil, "\r\n");
 	}
 
+	free(msg);
 	free(headers[0]);
 	free(headers[1]);
 	free(headers);
