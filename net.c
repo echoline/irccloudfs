@@ -193,7 +193,9 @@ parsestream(JSON *json)
 	JSON *jsonm, *jsonm2, *jsonm3, *jsonm4, *jsonm5;
 	JSONEl *next;
 	unsigned long bid;
+	unsigned long cid;
 	struct Buffer *buffer;
+	struct IRCServer *server;
 	struct User *user, *members;
 	char *msg;
 
@@ -235,6 +237,14 @@ parsestream(JSON *json)
 	else if (strcmp(jsonm->s, "buffer_msg") == 0
 		|| strcmp(jsonm->s, "buffer_me_msg") == 0
 		|| strcmp(jsonm->s, "notice") == 0) {
+		jsonm3 = jsonbyname(json, "cid");
+		if (jsonm3 == nil)
+			sysfatal("jsonbyname(cid): %r");
+		cid = (unsigned long)jsonm3->n;
+		server = findserver(cid);
+		if (server == nil)
+			return;
+
 		jsonm3 = jsonbyname(json, "bid");
 		if (jsonm3 == nil)
 			sysfatal("jsonbyname(bid): %r");
@@ -261,6 +271,24 @@ parsestream(JSON *json)
 		buffer->data = realloc(buffer->data, buffer->length + strlen(msg));
 		memcpy(buffer->data + buffer->length, msg, strlen(msg));
 		buffer->length += strlen(msg);
+
+		if (strcmp(buffer->type, "conversation") == 0) {
+			buffers->data = realloc(buffers->data, buffers->length + strlen(msg));
+			memcpy(buffers->data + buffers->length, msg, strlen(msg));
+			buffers->length += strlen(msg);
+		}
+		else if (strcmp(server->nick, jsonm3->s) != 0 && strstr(server->nick, jsonm2->s) != nil) {
+			buffers->data = realloc(buffers->data, buffers->length + strlen(buffer->name));
+			memcpy(buffers->data + buffers->length, buffer->name, strlen(buffer->name));
+			buffers->length += strlen(buffer->name);
+			buffers->data = realloc(buffers->data, buffers->length + 2);
+			memcpy(buffers->data + buffers->length, ": ", 2);
+			buffers->length += 2;
+			buffers->data = realloc(buffers->data, buffers->length + strlen(msg));
+			memcpy(buffers->data + buffers->length, msg, strlen(msg));
+			buffers->length += strlen(msg);
+		}
+
 		free(msg);
 	}
 	else if (strcmp(jsonm->s, "channel_init") == 0) {
@@ -491,36 +519,49 @@ parsestream(JSON *json)
 		free(msg);
 	} else if (strcmp(jsonm->s, "nickchange") == 0
 		|| strcmp(jsonm->s, "you_nickchange") == 0) {
-		jsonm = jsonbyname(json, "bid");
-		if (jsonm == nil)
+		jsonm5 = jsonbyname(json, "cid");
+		if (jsonm5 == nil)
+			sysfatal("jsonbyname(cid): %r");
+		cid = (unsigned long)jsonm5->n;
+		server = findserver(cid);
+		if (server == nil)
+			return;
+
+		jsonm5 = jsonbyname(json, "bid");
+		if (jsonm5 == nil)
 			sysfatal("jsonbyname(bid): %r");
-		bid = (unsigned long)jsonm->n;
+		bid = (unsigned long)jsonm5->n;
 		buffer = findbuffer(bid);
 		if (buffer == nil)
 			return;
 
-		jsonm = jsonbyname(json, "oldnick");
-		if (jsonm == nil)
+		jsonm5 = jsonbyname(json, "oldnick");
+		if (jsonm5 == nil)
 			sysfatal("jsonbyname(oldnick): %r");
 
 		jsonm2 = jsonbyname(json, "newnick");
 		if (jsonm2 == nil)
 			sysfatal("jsonbyname(newnick): %r");
 
+		if (strcmp(jsonm->s, "you_nickchange") == 0) {
+			free(server->nick);
+			server->nick = strdup(jsonm2->s);
+		}
+
 		for (members = buffer->members; members != nil; members = members->next) {
-			if (strcmp(jsonm->s, members->nick) == 0) {
+			if (strcmp(jsonm5->s, members->nick) == 0) {
 				free(members->nick);
 				members->nick = strdup(jsonm2->s);
 				break;
 			}
 		}
 
-		if (strcmp(buffer->name, jsonm->s) == 0) {
+		if (strcmp(buffer->name, jsonm5->s) == 0) {
 			free(buffer->f->name);
-			buffer->f->name = strdup(jsonm->s);
+			buffer->f->name = strdup(jsonm5->s);
 		}
 
-		msg = smprint("NICK %s → %s\n", jsonm->s, jsonm2->s);
+		msg = smprint("NICK %s → %s\n", jsonm5->s, jsonm2->s);
 		buffer->data = realloc(buffer->data, buffer->length + strlen(msg));
 		memcpy(buffer->data + buffer->length, msg, strlen(msg));
 		buffer->length += strlen(msg);
@@ -713,21 +754,26 @@ say(unsigned long cid, char *to, char *data, unsigned long count)
 	char *postdata;
 	int fd;
 	char **headers = calloc(3, sizeof(char*));
-	char *msg = malloc(count+1);
-
-	memcpy(msg, data, count);
-	msg[count] = '\0';
-
-	postdata = smprint("cid=%d&to=%s&msg=%s&token=%s&session=%s", cid, to, msg, token, session);
+	char *tok = strtok(data, "\r\n");
 
 	headers[0] = smprint("x-auth-formtoken: %s", token);
 	headers[1] = smprint("Cookie: session=%s", session);
 
-	fd = openurl(SAYURL, headers, 1, postdata, nil);
-	close(fd);
+	while (tok != nil) {
+		if (strlen(tok) == 0) {
+			tok = strtok(nil, "\r\n");
+			continue;
+		}
 
-	free(msg);
-	free(postdata);
+		postdata = smprint("cid=%d&to=%s&msg=%s&token=%s&session=%s", cid, to, tok, token, session);
+
+		fd = openurl(SAYURL, headers, 1, postdata, nil);
+		close(fd);
+
+		free(postdata);
+		tok = strtok(nil, "\r\n");
+	}
+
 	free(headers[0]);
 	free(headers[1]);
 	free(headers);

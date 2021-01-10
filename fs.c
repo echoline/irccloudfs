@@ -62,8 +62,7 @@ fswrite(Req *r)
 	struct Buffer *buffer = f->aux;
 
 	if (strcmp(f->name, "data") == 0) {
-		if (r->ifcall.data[0] != '\n')
-			say(buffer->server->cid, buffer->name, r->ifcall.data, r->ifcall.count);
+		say(buffer->server->cid, buffer->name, r->ifcall.data, r->ifcall.count);
 		r->ofcall.count = r->ifcall.count;
 		respond(r, nil);
 		return;
@@ -99,7 +98,7 @@ Srv fssrv = {
 void
 allocserver(JSON *json)
 {
-	JSON *jsonm;
+	JSON *jsonm, *nick;
 	unsigned long cid;
 	struct IRCServer *cur;
 
@@ -118,6 +117,10 @@ allocserver(JSON *json)
 	if (jsonm == nil)
 		sysfatal("allocserver: jsonbyname(name): %r");
 
+	nick = jsonbyname(json, "nick");
+	if (nick == nil)
+		sysfatal("allocserver: jsonbyname(nick): %r");
+
 	if (ircservers == nil) {
 		ircservers = calloc(1, sizeof(struct IRCServer));
 		cur = ircservers;
@@ -134,7 +137,23 @@ allocserver(JSON *json)
 	}
 
 	cur->cid = cid;
-	cur->f = createfile(fssrv.tree->root, jsonm->s, nil, DMDIR|0777, nil);
+	cur->nick = strdup(nick->s);
+	cur->f = createfile(fssrv.tree->root, jsonm->s, nil, DMDIR|0777, cur);
+}
+
+struct IRCServer*
+findserver(unsigned long cid)
+{
+	struct IRCServer *server;
+
+	server = ircservers;
+	while (server != nil) {
+		if (server->cid == cid)
+			return server;
+		server = server->next;
+	}
+
+	return nil;
 }
 
 struct Buffer*
@@ -238,9 +257,11 @@ startfs(void)
 	char *srvname = smprint("irccloud.%d", getpid());
 
 	ircservers = nil;
-	buffers = nil;
+	buffers = calloc(1, sizeof(struct Buffer));
 
 	fssrv.tree = alloctree(nil, nil, DMDIR|0777, nil);
+	createfile(fssrv.tree->root, "data", nil, 0444, buffers);
+	buffers->data = malloc(1);
 	postmountsrv(&fssrv, srvname, "/n/irccloud", 0);
 
 	free(srvname);

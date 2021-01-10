@@ -2,6 +2,7 @@ struct IRCServer {
 	unsigned long cid;
 	File *f;
 	struct IRCServer *next;
+	char *nick;
 };
 
 struct User {
