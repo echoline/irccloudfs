@@ -207,12 +207,16 @@ parsestream(JSON *json)
 
 	if (strcmp(jsonm->s, "header") == 0) {
 		jsonm = jsonbyname(json, "streamid");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(streamid): %r");
 		if (streamid != nil)
 			free(streamid);
 		streamid = strdup(jsonm->s);
 	}
 	else if (strcmp(jsonm->s, "oob_include") == 0) {
 		jsonm = jsonbyname(json, "url");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(url): %r");
 		backlog = 1;
 		readbacklog(jsonm->s);
 	}
@@ -392,6 +396,53 @@ parsestream(JSON *json)
 		}
 
 		msg = smprint("PART %s from %s\n", jsonm->s, jsonm2->s);
+		buffer->data = realloc(buffer->data, buffer->length + strlen(msg));
+		memcpy(buffer->data + buffer->length, msg, strlen(msg));
+		buffer->length += strlen(msg);
+		free(msg);
+	} else if (strcmp(jsonm->s, "kicked_channel") == 0) {
+		jsonm = jsonbyname(json, "bid");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(bid): %r");
+		bid = (unsigned long)jsonm->n;
+		buffer = findbuffer(bid);
+		if (buffer == nil)
+			sysfatal("findbuffer: %r");
+
+		jsonm = jsonbyname(json, "nick");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(nick): %r");
+
+		jsonm2 = jsonbyname(json, "chan");
+		if (jsonm2 == nil)
+			sysfatal("jsonbyname(chan): %r");
+
+		jsonm3 = jsonbyname(json, "kicker");
+		if (jsonm3 == nil)
+			sysfatal("jsonbyname(kicker): %r");
+
+		jsonm4 = jsonbyname(json, "msg");
+		if (jsonm4 == nil)
+			sysfatal("jsonbyname(msg): %r");
+
+		if (buffer->members != nil) {
+			if (strcmp(jsonm->s, buffer->members->nick) == 0) {
+				free(buffer->members->nick);
+				free(buffer->members->mode);
+				members = buffer->members->next;
+				free(buffer->members);
+				buffer->members = members;
+			} else for (members = buffer->members->next, user = buffer->members; members != nil; user = members, members = members->next) {
+				if (strcmp(jsonm->s, members->nick) == 0) {
+					free(members->nick);
+					free(members->mode);
+					user->next = members->next;
+					free(members);
+				}
+			}
+		}
+
+		msg = smprint("KICK %s from %s by %s - %s\n", jsonm->s, jsonm2->s, jsonm3->s, jsonm4->s);
 		buffer->data = realloc(buffer->data, buffer->length + strlen(msg));
 		memcpy(buffer->data + buffer->length, msg, strlen(msg));
 		buffer->length += strlen(msg);
