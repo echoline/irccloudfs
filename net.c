@@ -435,8 +435,8 @@ parsestream(JSON *json)
 		memcpy(buffer->data + buffer->length, msg, strlen(msg));
 		buffer->length += strlen(msg);
 		free(msg);
-//	} else {
-//		print("%s ", jsonm->s);
+	} else {
+		print("%s ", jsonm->s);
 	}
 }
 
@@ -515,6 +515,8 @@ readstream(void)
 		jsonfree(json);
 		free(tmp);
 	}
+
+	print("running = %d\n", running);
 }
 
 void

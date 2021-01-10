@@ -105,8 +105,14 @@ allocserver(JSON *json)
 
 	jsonm = jsonbyname(json, "cid");
 	if (jsonm == nil)
-		sysfatal("allocbuffer: jsonbyname(cid): %r");
+		sysfatal("allocserver: jsonbyname(cid): %r");
 	cid = (unsigned long)jsonm->n;
+
+	jsonm = jsonbyname(json, "status");
+	if (jsonm == nil)
+		sysfatal("allocserver: jsonbyname(status): %r");
+	if (strcmp(jsonm->s, "disconnected") == 0)
+		return;
 
 	jsonm = jsonbyname(json, "name");
 	if (jsonm == nil)
@@ -193,7 +199,7 @@ allocbuffer(JSON *json)
 	}
 
 	if (server == nil)
-		sysfatal("allocbuffer: server not found");
+		return;
 
 	if (buffers == nil) {
 		buffers = calloc(1, sizeof(struct Buffer));
