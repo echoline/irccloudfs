@@ -291,6 +291,31 @@ parsestream(JSON *json)
 
 		free(msg);
 	}
+	else if (strcmp(jsonm->s, "channel_topic") == 0) {
+		jsonm = jsonbyname(json, "bid");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(bid): %r");
+		bid = (unsigned long)jsonm->n;
+		buffer = findbuffer(bid);
+		if (buffer == nil)
+			return;
+
+		jsonm = jsonbyname(json, "chan");
+		if (jsonm == nil)
+			sysfatal("jsonbyname(chan): %r");
+		jsonm3 = jsonbyname(json, "topic_time");
+		if (jsonm3 == nil)
+			sysfatal("jsonbyname(topic_time): %r");
+		jsonm4 = jsonbyname(json, "author");
+		if (jsonm4 == nil)
+			sysfatal("jsonbyname(author): %r");
+		jsonm5 = jsonbyname(json, "topic");
+		if (jsonm5 == nil)
+			sysfatal("jsonbyname(topic): %r");
+		if (buffer->topic != nil)
+			free(buffer->topic);
+		buffer->topic = smprint("%s %c%s\ntopic set at %d by %s:\n%s\n", jsonm->s, buffer->mode == nil || buffer->mode[0] == '\0'? ' ': '+', buffer->mode == nil? "": buffer->mode, (unsigned long)jsonm3->n, jsonm4->s, jsonm5->s);
+	}
 	else if (strcmp(jsonm->s, "channel_init") == 0) {
 		jsonm = jsonbyname(json, "bid");
 		if (jsonm == nil)
