@@ -1,7 +1,7 @@
 </$objtype/mkfile
 
-irccloudfs: net.$O main.$O fs.$O
-	$O^l -o irccloudfs net.$O main.$O fs.$O
+$O.irccloudfs: net.$O main.$O fs.$O
+	$O^l -o $O.irccloudfs net.$O main.$O fs.$O
 
 main.$O: main.c
 	$O^c main.c
@@ -13,4 +13,7 @@ fs.$O: fs.c
 	$O^c fs.c
 
 clean:V:
-	rm -f *.$O irccloudfs
+	rm -f *.[$OS] [$OS].irccloudfs
+
+install: $O.irccloudfs
+	cp $O.irccloudfs $home/bin/$objtype/irccloudfs
