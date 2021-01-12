@@ -18,9 +18,9 @@ fsread(Req *r)
 	File *f = r->fid->file;
 	struct Buffer *buffer = f->aux;
 	char *buf = nil;
-	unsigned long blen = 0;
+	ulong blen = 0;
 	char *tmp;
-	unsigned long len;
+	ulong len;
 	struct User *members;
 
 	if (strcmp(f->name, "data") == 0) {
@@ -99,13 +99,13 @@ void
 allocserver(JSON *json)
 {
 	JSON *jsonm, *nick;
-	unsigned long cid;
+	vlong cid;
 	struct IRCServer *cur;
 
 	jsonm = jsonbyname(json, "cid");
 	if (jsonm == nil)
 		sysfatal("allocserver: jsonbyname(cid): %r");
-	cid = (unsigned long)jsonm->n;
+	cid = (vlong)jsonm->n;
 
 	jsonm = jsonbyname(json, "status");
 	if (jsonm == nil)
@@ -142,7 +142,7 @@ allocserver(JSON *json)
 }
 
 struct IRCServer*
-findserver(unsigned long cid)
+findserver(vlong cid)
 {
 	struct IRCServer *server;
 
@@ -157,7 +157,7 @@ findserver(unsigned long cid)
 }
 
 struct Buffer*
-findbuffer(unsigned long bid)
+findbuffer(vlong bid)
 {
 	struct Buffer *buffer;
 
@@ -175,31 +175,31 @@ void
 allocbuffer(JSON *json)
 {
 	JSON *jsonm;
-	unsigned long cid;
-	unsigned long bid;
+	vlong cid;
+	vlong bid;
 	struct IRCServer *server;
 	struct Buffer *buffer;
-	unsigned long timeout = 0;
-	unsigned long deferred = 0;
+	char timeout = 0;
+	char deferred = 0;
 	char *type;
 
 	jsonm = jsonbyname(json, "timeout");
 	if (jsonm != nil)
-		timeout = (unsigned long)jsonm->n;
+		timeout = (char)jsonm->n;
 
 	jsonm = jsonbyname(json, "deferred");
 	if (jsonm != nil)
-		deferred = (unsigned long)jsonm->n;
+		deferred = (char)jsonm->n;
 
 	jsonm = jsonbyname(json, "cid");
 	if (jsonm == nil)
 		sysfatal("allocbuffer: jsonbyname(cid): %r");
-	cid = (unsigned long)jsonm->n;
+	cid = (vlong)jsonm->n;
 
 	jsonm = jsonbyname(json, "bid");
 	if (jsonm == nil)
 		sysfatal("allocbuffer: jsonbyname(bid): %r");
-	bid = (unsigned long)jsonm->n;
+	bid = (vlong)jsonm->n;
 
 	jsonm = jsonbyname(json, "buffer_type");
 	if (jsonm == nil)

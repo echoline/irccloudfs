@@ -1,5 +1,5 @@
 struct IRCServer {
-	unsigned long cid;
+	vlong cid;
 	File *f;
 	struct IRCServer *next;
 	char *nick;
@@ -13,15 +13,15 @@ struct User {
 };
 
 struct Buffer {
-	unsigned long bid;
-	unsigned long cid;
-	unsigned long timeout;
-	unsigned long deferred;
+	vlong bid;
+	vlong cid;
+	char timeout;
+	char deferred;
 	File *f;
 	File *dataf;
 	File *topicf;
 	File *membersf;
-	unsigned long last_eid;
+	vlong last_eid;
 	char *data;
 	vlong length;
 	struct Buffer *next;
