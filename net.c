@@ -801,6 +801,8 @@ say(vlong cid, char *to, char *data, unsigned long count)
 		case 0:
 			dup(pfd[1], 0);
 			dup(pfd[1], 1);
+			close(pfd[1]);
+			close(pfd[0]);
 			execl("/bin/urlencode", "urlencode", nil);
 			sysfatal("execl: %r");
 		default:
