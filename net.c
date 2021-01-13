@@ -100,7 +100,7 @@ openurl(char *url, char **headers, int post, char *postdata, char *type)
 }
 
 char*
-readbody(int bodyfd)
+readfd(int fd)
 {
 	char *buf;
 	int i, r;
@@ -108,14 +108,14 @@ readbody(int bodyfd)
 	buf = malloc(8192);
 	buf[0] = '\0';
 	i = 0;
-	while ((r = read(bodyfd, buf + i, 8192-1)) > 0) {
+	while ((r = read(fd, buf + i, 8192-1)) > 0) {
 		i += r;
 		buf[i] = '\0';
 		buf = realloc(buf, i + 8192);
 	}
 
 	if (r < 0)
-		sysfatal("read bodyfd: %r");
+		sysfatal("read fd: %r");
 
 	return buf;
 }
@@ -130,7 +130,7 @@ login(char *username, char *password)
 	char *postdata;
 
 	fd = openurl(AUTHURL, nil, 1, "", nil);
-	buf = readbody(fd);
+	buf = readfd(fd);
 	if (buf[0] == '\0')
 		sysfatal("short authtoken read");
 	json = jsonparse(buf);
@@ -161,7 +161,7 @@ login(char *username, char *password)
 	free(headers[0]);
 	free(headers);
 	free(postdata);
-	buf = readbody(fd);
+	buf = readfd(fd);
 	if (buf[0] == '\0')
 		sysfatal("short login read");
 	json = jsonparse(buf);
@@ -682,8 +682,8 @@ parsestream(JSON *json)
 		msg = smprint("MODE %s %s %s\n", jsonm4->s, jsonm3->s, jsonm->s);
 		writebuffer(buffer, msg, timestamp);
 		free(msg);
-	} else {
-		print("%J\n", json);
+//	} else {
+//		print("%J\n", json);
 	}
 }
 
@@ -706,7 +706,7 @@ readbacklog(char *path)
 
 	url = smprint("%s%s\n", URL, path);
 	fd = openurl(url, headers, 0, nil, nil);
-	tmp = readbody(fd);
+	tmp = readfd(fd);
 	json = jsonparse(tmp);
 	if (json == nil)
 		sysfatal("jsonparse: %r");
@@ -769,13 +769,20 @@ say(vlong cid, char *to, char *data, unsigned long count)
 {
 	char *postdata;
 	int fd;
-	char **headers = calloc(3, sizeof(char*));
-	char *msg = calloc(1, count + 1);
+	char **headers;
+	char *msg;
 	char *tok;
+	char *tmp;
+	int pfd[2];
 
+	if (count == 0)
+		return;
+
+	msg = calloc(1, count + 1);
 	strncpy(msg, data, count);
 	tok = strtok(msg, "\r\n");
 
+	headers = calloc(3, sizeof(char*));
 	headers[0] = smprint("x-auth-formtoken: %s", token);
 	headers[1] = smprint("Cookie: session=%s", session);
 
@@ -785,12 +792,34 @@ say(vlong cid, char *to, char *data, unsigned long count)
 			continue;
 		}
 
-		postdata = smprint("cid=%d&to=%s&msg=%s&token=%s&session=%s", cid, to, tok, token, session);
+		if (pipe(pfd) < 0)
+			sysfatal("pipe: %r");
 
-		fd = openurl(SAYURL, headers, 1, postdata, nil);
-		close(fd);
+		switch (fork()) {
+		case -1:
+			sysfatal("fork: %r");
+		case 0:
+			dup(pfd[1], 0);
+			dup(pfd[1], 1);
+			execl("/bin/urlencode", "urlencode", nil);
+			sysfatal("execl: %r");
+		default:
+			write(pfd[0], tok, strlen(tok));
+			write(pfd[0], "", 0);
+			close(pfd[1]);
+			tmp = readfd(pfd[0]);
+			close(pfd[0]);
+		}
 
-		free(postdata);
+		if (strlen(tmp) > 0) {
+			postdata = smprint("cid=%d&to=%s&msg=%s&token=%s&session=%s", cid, to, tmp, token, session);
+
+			fd = openurl(SAYURL, headers, 1, postdata, nil);
+			close(fd);
+
+			free(postdata);
+		}
+		free(tmp);
 		tok = strtok(nil, "\r\n");
 	}
 
