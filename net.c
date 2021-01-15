@@ -121,7 +121,7 @@ readfd(int fd)
 }
 
 int
-login(char *username, char *password)
+irccloudlogin(char *username, char *password)
 {
 	JSON *json, *jsonm;
 	char *buf;

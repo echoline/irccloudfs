@@ -1,4 +1,4 @@
-int login(char*, char*);
+int irccloudlogin(char*, char*);
 void readstream(void*);
 void say(vlong, char*, char*, unsigned long);
 

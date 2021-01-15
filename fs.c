@@ -294,6 +294,7 @@ startfs(void)
 	fssrv.tree = alloctree(nil, nil, DMDIR|0777, nil);
 	createfile(fssrv.tree->root, "data", nil, 0444, buffers);
 	buffers->data = malloc(1);
+	buffers->reqchan = chancreate(sizeof(Req*), 16);
 	threadpostmountsrv(&fssrv, srvname, "/n/irccloud", 0);
 
 	free(srvname);

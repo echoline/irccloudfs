@@ -1,32 +1,26 @@
 #include <u.h>
 #include <libc.h>
-#include <bio.h>
 #include <json.h>
 #include <thread.h>
 #include <fcall.h>
 #include <9p.h>
+#include <auth.h>
 #include "dat.h"
 #include "fns.h"
 
 void
 threadmain(int argc, char **argv)
 {
-	char *email;
-	char *password;
-	Biobuf *bin;
+	UserPasswd *up;
 	int r;
 
-	bin = Bfdopen(0, OREAD);
+	up = auth_getuserpasswd(auth_getkey, "proto=pass service=irccloud");
+	if (up == nil)
+		return;
 
-	print("email: ");
-	email = Brdstr(bin, '\n', 1);
-	print("password: ");
-	password = Brdstr(bin, '\n', 1);
-
-	login(email, password);
-	memset(password, '\0', strlen(password));
-	free(password);
-	free(email);
+	irccloudlogin(up->user, up->passwd);
+	memset(up->passwd, '\0', strlen(up->passwd));
+	free(up);
 
 	procrfork(readstream, nil, mainstacksize, RFNOTEG);
 	startfs();
