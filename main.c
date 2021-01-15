@@ -9,7 +9,7 @@
 #include "fns.h"
 
 void
-main(int argc, char **argv)
+threadmain(int argc, char **argv)
 {
 	char *email;
 	char *password;
@@ -28,11 +28,7 @@ main(int argc, char **argv)
 	free(password);
 	free(email);
 
+	proccreate(readstream, nil, mainstacksize);
 	startfs();
-	r = rfork(RFFDG|RFREND|RFPROC|RFMEM|RFNOTEG|RFNOWAIT);
-	if (r < 0)
-		sysfatal("rfork: %r");
-	if (r == 0)
-		readstream();
-	exits(nil);
+	threadexits(nil);
 }

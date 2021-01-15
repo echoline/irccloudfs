@@ -189,6 +189,7 @@ login(char *username, char *password)
 
 void
 writebuffer(struct Buffer *buffer, char *msg, ulong timestamp) {
+	Req *r;
 	Tm *tm = localtime(timestamp);
 	char *tmstr = smprint("%02d:%02d:%02d ", tm->hour, tm->min, tm->sec);
 
@@ -201,6 +202,11 @@ writebuffer(struct Buffer *buffer, char *msg, ulong timestamp) {
 	buffer->data = realloc(buffer->data, buffer->length + strlen(msg));
 	memcpy(buffer->data + buffer->length, msg, strlen(msg));
 	buffer->length += strlen(msg);
+
+	if (buffer->reqchan != nil) while((r = nbrecvp(buffer->reqchan)) != nil) {
+		readbuf(r, buffer->data, buffer->length);
+		respond(r, nil);
+	}
 }
 
 void
@@ -682,8 +688,8 @@ parsestream(JSON *json)
 		msg = smprint("MODE %s %s %s\n", jsonm4->s, jsonm3->s, jsonm->s);
 		writebuffer(buffer, msg, timestamp);
 		free(msg);
-//	} else {
-//		print("%J\n", json);
+	} else {
+		print("%J\n", json);
 	}
 }
 
@@ -722,7 +728,7 @@ readbacklog(char *path)
 }
 
 void
-readstream(void)
+readstream(void *unused)
 {
 	JSON *json, *jsonm;
 	char *buf;
@@ -765,6 +771,19 @@ readstream(void)
 }
 
 void
+urlencode(void *arg)
+{
+	int *pfd = (int*)arg;
+
+	dup(pfd[1], 0);
+	dup(pfd[1], 1);
+	close(pfd[1]);
+	close(pfd[0]);
+	execl("/bin/urlencode", "urlencode", nil);
+	sysfatal("execl: %r");
+}
+
+void
 say(vlong cid, char *to, char *data, unsigned long count)
 {
 	char *postdata;
@@ -795,23 +814,13 @@ say(vlong cid, char *to, char *data, unsigned long count)
 		if (pipe(pfd) < 0)
 			sysfatal("pipe: %r");
 
-		switch (fork()) {
-		case -1:
-			sysfatal("fork: %r");
-		case 0:
-			dup(pfd[1], 0);
-			dup(pfd[1], 1);
-			close(pfd[1]);
-			close(pfd[0]);
-			execl("/bin/urlencode", "urlencode", nil);
-			sysfatal("execl: %r");
-		default:
-			write(pfd[0], tok, strlen(tok));
-			write(pfd[0], "", 0);
-			close(pfd[1]);
-			tmp = readfd(pfd[0]);
-			close(pfd[0]);
-		}
+		procrfork(urlencode, pfd, mainstacksize, RFFDG);
+
+		write(pfd[0], tok, strlen(tok));
+		write(pfd[0], "", 0);
+		close(pfd[1]);
+		tmp = readfd(pfd[0]);
+		close(pfd[0]);
 
 		if (strlen(tmp) > 0) {
 			postdata = smprint("cid=%d&to=%s&msg=%s&token=%s&session=%s", cid, to, tmp, token, session);

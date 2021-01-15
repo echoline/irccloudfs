@@ -24,8 +24,13 @@ fsread(Req *r)
 	struct User *members;
 
 	if (strcmp(f->name, "data") == 0) {
-		readbuf(r, buffer->data, buffer->length);
-		respond(r, nil);
+		if (r->ifcall.offset < buffer->length) {
+			readbuf(r, buffer->data, buffer->length);
+			respond(r, nil);
+		} else {
+			if (nbsendp(buffer->reqchan, r) != 1)
+				respond(r, "nbsendp failed");
+		}
 		return;
 	}
 	else if (strcmp(f->name, "topic") == 0
@@ -88,11 +93,34 @@ fsend(Srv *s)
 	running = 0;
 }
 
+static void
+fsflush(Req *r)
+{
+	Req *check;
+	struct Buffer *buffer;
+
+	File *f = r->oldreq->fid->file;
+
+	if (strcmp(f->name, "data") == 0) {
+		buffer = (struct Buffer*)f->aux;
+		while((check = nbrecvp(buffer->reqchan)) != nil)
+			if (check == r->oldreq) {
+				respond(check, "interrupted");
+				break;
+			}
+			else
+				sendp(buffer->reqchan, check);
+	}
+
+	respond(r, nil);
+}
+
 Srv fssrv = {
 	.read = fsread,
 	.write = fswrite,
 	.stat = fsstat,
 	.end = fsend,
+	.flush = fsflush,
 };
 
 void
@@ -245,6 +273,7 @@ allocbuffer(JSON *json)
 	buffer->f = createfile(server->f, jsonm->s, nil, DMDIR|0777, server);
 	buffer->dataf = createfile(buffer->f, "data", nil, 0666, buffer);
 	buffer->data = malloc(1);
+	buffer->reqchan = chancreate(sizeof(Req*), 16);
 	if (strcmp(type, "channel") == 0) {
 		buffer->topicf = createfile(buffer->f, "topic", nil, 0444, buffer);
 		buffer->membersf = createfile(buffer->f, "members", nil, 0444, buffer);
@@ -262,7 +291,7 @@ startfs(void)
 	fssrv.tree = alloctree(nil, nil, DMDIR|0777, nil);
 	createfile(fssrv.tree->root, "data", nil, 0444, buffers);
 	buffers->data = malloc(1);
-	postmountsrv(&fssrv, srvname, "/n/irccloud", 0);
+	threadpostmountsrv(&fssrv, srvname, "/n/irccloud", 0);
 
 	free(srvname);
 }

@@ -1,5 +1,5 @@
 int login(char*, char*);
-void readstream(void);
+void readstream(void*);
 void say(vlong, char*, char*, unsigned long);
 
 void startfs(void);

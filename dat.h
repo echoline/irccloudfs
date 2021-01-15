@@ -31,4 +31,5 @@ struct Buffer {
 	char *topic;
 	char *mode;
 	struct User *members;
+	Channel *reqchan;
 };
