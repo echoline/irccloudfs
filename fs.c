@@ -102,14 +102,17 @@ fsflush(Req *r)
 	File *f = r->oldreq->fid->file;
 
 	if (strcmp(f->name, "data") == 0) {
-		buffer = (struct Buffer*)f->aux;
-		while((check = nbrecvp(buffer->reqchan)) != nil)
-			if (check == r->oldreq) {
-				respond(check, "interrupted");
-				break;
+		if (r->oldreq->ifcall.type == Tread) {
+			buffer = (struct Buffer*)f->aux;
+			while((check = nbrecvp(buffer->reqchan)) != nil) {
+				if (check == r->oldreq) {
+					respond(check, "interrupted");
+					break;
+				}
+				else
+					sendp(buffer->reqchan, check);
 			}
-			else
-				sendp(buffer->reqchan, check);
+		}
 	}
 
 	respond(r, nil);

@@ -688,8 +688,8 @@ parsestream(JSON *json)
 		msg = smprint("MODE %s %s %s\n", jsonm4->s, jsonm3->s, jsonm->s);
 		writebuffer(buffer, msg, timestamp);
 		free(msg);
-	} else {
-		print("%J\n", json);
+//	} else {
+//		print("%J\n", json);
 	}
 }
 
@@ -768,6 +768,8 @@ readstream(void *unused)
 		jsonfree(json);
 		free(tmp);
 	}
+
+	print("readstream done\n");
 }
 
 void

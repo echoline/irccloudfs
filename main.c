@@ -28,7 +28,7 @@ threadmain(int argc, char **argv)
 	free(password);
 	free(email);
 
-	proccreate(readstream, nil, mainstacksize);
+	procrfork(readstream, nil, mainstacksize, RFNOTEG);
 	startfs();
 	threadexits(nil);
 }
