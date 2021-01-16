@@ -22,8 +22,20 @@ fsread(Req *r)
 	char *tmp;
 	ulong len;
 	struct User *members;
+	struct User *user;
 
-	if (strcmp(f->name, "data") == 0) {
+	if (f->parent != nil
+		&& strcmp(f->parent->name, "members") == 0
+		&& (buffer = f->parent->aux) != nil
+		&& strcmp(buffer->type, "channel") == 0) {
+		user = (struct User*)f->aux;
+		if (user != nil) {
+			readstr(r, user->mode);
+			respond(r, nil);
+			return;
+		}
+	}
+	else if (strcmp(f->name, "data") == 0) {
 		if (r->ifcall.offset < buffer->length) {
 			readbuf(r, buffer->data, buffer->length);
 			respond(r, nil);
@@ -38,23 +50,6 @@ fsread(Req *r)
 		readstr(r, buffer->topic);
 		respond(r, nil);
 		return;
-	}
-	else if (strcmp(f->name, "members") == 0
-		&& strcmp(buffer->type, "channel") == 0) {
-		for (members = buffer->members; members != nil; members = members->next) {
-			tmp = smprint("%s %c%s\n", members->nick, members->mode[0] != '\0'? '+': ' ', members->mode);
-			len = strlen(tmp);
-			buf = realloc(buf, blen + len);
-			memcpy(buf + blen, tmp, len);
-			blen += len;
-			free(tmp);
-		}
-		if (buf != nil) {
-			readbuf(r, buf, blen);
-			respond(r, nil);
-			free(buf);
-			return;
-		}
 	}
 
 	respond(r, "no");
@@ -279,7 +274,7 @@ allocbuffer(JSON *json)
 	buffer->reqchan = chancreate(sizeof(Req*), 16);
 	if (strcmp(type, "channel") == 0) {
 		buffer->topicf = createfile(buffer->f, "topic", nil, 0444, buffer);
-		buffer->membersf = createfile(buffer->f, "members", nil, 0444, buffer);
+		buffer->membersf = createfile(buffer->f, "members", nil, DMDIR|0555, buffer);
 	}
 }
 

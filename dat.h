@@ -9,7 +9,9 @@ struct User {
 	char *nick;
 	char *realname;
 	char *mode;
+	File *f;
 	struct User *next;
+	struct Buffer *buffer;
 };
 
 struct Buffer {

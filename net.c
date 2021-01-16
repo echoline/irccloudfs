@@ -394,6 +394,9 @@ parsestream(JSON *json)
 			user->nick = strdup(jsonm3->s);
 			user->mode = strdup(jsonm5->s);
 			user->next = members;
+			user->buffer = buffer;
+			if (buffer->membersf != nil)
+				user->f = createfile(buffer->membersf, user->nick, nil, 0444, user);
 			members = user;
 		}
 		buffer->members = members;
@@ -424,6 +427,9 @@ parsestream(JSON *json)
 			user->nick = strdup(jsonm->s);
 			user->mode = calloc(1, sizeof(char));
 			user->next = buffer->members;
+			user->buffer = buffer;
+			if (buffer->membersf != nil)
+				user->f = createfile(buffer->membersf, user->nick, nil, 0444, user);
 			buffer->members = user;
 		}
 
@@ -452,6 +458,8 @@ parsestream(JSON *json)
 			if (strcmp(jsonm->s, buffer->members->nick) == 0) {
 				free(buffer->members->nick);
 				free(buffer->members->mode);
+				if (buffer->members->f != nil)
+					removefile(buffer->members->f);
 				members = buffer->members->next;
 				free(buffer->members);
 				buffer->members = members;
@@ -459,6 +467,8 @@ parsestream(JSON *json)
 				if (strcmp(jsonm->s, members->nick) == 0) {
 					free(members->nick);
 					free(members->mode);
+					if (members->f != nil)
+						removefile(members->f);
 					user->next = members->next;
 					free(members);
 				}
@@ -498,6 +508,8 @@ parsestream(JSON *json)
 			if (strcmp(jsonm->s, buffer->members->nick) == 0) {
 				free(buffer->members->nick);
 				free(buffer->members->mode);
+				if (buffer->members->f != nil)
+					removefile(buffer->members->f);
 				members = buffer->members->next;
 				free(buffer->members);
 				buffer->members = members;
@@ -505,6 +517,8 @@ parsestream(JSON *json)
 				if (strcmp(jsonm->s, members->nick) == 0) {
 					free(members->nick);
 					free(members->mode);
+					if (members->f != nil)
+						removefile(members->f);
 					user->next = members->next;
 					free(members);
 				}
@@ -535,6 +549,8 @@ parsestream(JSON *json)
 			if (strcmp(jsonm->s, buffer->members->nick) == 0) {
 				free(buffer->members->nick);
 				free(buffer->members->mode);
+				if (buffer->members->f != nil)
+					removefile(buffer->members->f);
 				members = buffer->members->next;
 				free(buffer->members);
 				buffer->members = members;
@@ -542,6 +558,8 @@ parsestream(JSON *json)
 				if (strcmp(jsonm->s, members->nick) == 0) {
 					free(members->nick);
 					free(members->mode);
+					if (members->f != nil)
+						removefile(members->f);
 					user->next = members->next;
 					free(members);
 				}
@@ -586,6 +604,8 @@ parsestream(JSON *json)
 			if (strcmp(jsonm5->s, members->nick) == 0) {
 				free(members->nick);
 				members->nick = strdup(jsonm2->s);
+				free(members->f->name);
+				members->f->name = strdup(members->nick);
 				break;
 			}
 		}
