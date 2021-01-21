@@ -708,8 +708,8 @@ parsestream(JSON *json)
 		msg = smprint("MODE %s %s %s\n", jsonm4->s, jsonm3->s, jsonm->s);
 		writebuffer(buffer, msg, timestamp);
 		free(msg);
-//	} else {
-//		print("%J\n", json);
+	} else {
+		print("%J\n", json);
 	}
 }
 
@@ -723,7 +723,7 @@ readbacklog(char *path)
 	char *tmp = nil;
 	char **headers;
 	int l;
-	JSON *json;
+	JSON *json, *jsonm;
 	JSONEl *next;
 	struct Buffer *buffer;
 
@@ -737,6 +737,11 @@ readbacklog(char *path)
 	if (json == nil)
 		sysfatal("jsonparse: %r");
 	free(tmp);
+	for (next = json->first; next != nil; next = next->next) {
+		jsonm = jsonbyname(next->val, "type");
+		if (jsonm != nil && jsonm->t == JSONString && strcmp(jsonm->s, "channel_init") == 0)
+			parsestream(next->val);
+	}
 	for (next = json->first; next != nil; next = next->next)
 		parsestream(next->val);
 	jsonfree(json);
