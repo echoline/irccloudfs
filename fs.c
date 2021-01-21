@@ -205,17 +205,20 @@ allocbuffer(JSON *json)
 	vlong bid;
 	struct IRCServer *server;
 	struct Buffer *buffer;
-	char timeout = 0;
-	char deferred = 0;
+	int timeout = 0;
+	int deferred = 0;
 	char *type;
 
 	jsonm = jsonbyname(json, "timeout");
 	if (jsonm != nil)
-		timeout = (char)jsonm->n;
+		timeout = jsonm->n;
 
 	jsonm = jsonbyname(json, "deferred");
 	if (jsonm != nil)
-		deferred = (char)jsonm->n;
+		deferred = jsonm->n;
+
+	if (deferred != 0)
+		return; // ???
 
 	jsonm = jsonbyname(json, "cid");
 	if (jsonm == nil)
