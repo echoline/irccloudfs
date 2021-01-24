@@ -239,14 +239,9 @@ allocbuffer(JSON *json)
 	if (jsonm == nil)
 		sysfatal("allocbuffer: jsonbyname(name): %r");
 
-	server = ircservers;
-	while(server != nil) {
-		if (server->cid == cid)
-			break;
-		server = server->next;
-	}
+	server = findserver(cid);
 
-	if (server == nil)
+	if (server == nil || jsonstr(jsonm) == nil || walkfile(server->f, jsonm->s) != nil)
 		return;
 
 	if (buffers == nil) {
