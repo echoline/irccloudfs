@@ -1,6 +1,6 @@
 </$objtype/mkfile
 
-TARG=irccloudfs irccloud
+TARG=irccloudfs
 BIN=$home/bin/$objtype
 
 FSFILES=\
@@ -13,5 +13,3 @@ FSFILES=\
 $O.irccloudfs: $FSFILES
 	$LD -o $target $prereq
 
-$O.irccloud: irccloud.$O
-	$LD -o $target $prereq
