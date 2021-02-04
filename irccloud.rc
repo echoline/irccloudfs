@@ -1,0 +1,31 @@
+#!/bin/rc -i
+
+fn sighup {
+	@{echo hangup > /proc/$catpid/note}
+	if (~ $wd '#'*)
+		cd ..
+	pwd > /dev/wdir
+}
+
+fn sigint {
+	sighup
+}
+
+if (! ~ $"* '')
+	cd $"*
+
+wd=`{basename `{pwd}}
+data=data
+
+if (~ $wd '#'*) {
+	cd members
+	pwd > /dev/wdir
+	data=../data
+}
+
+cat $data &
+catpid=$apid
+cat > $data
+
+sighup
+
