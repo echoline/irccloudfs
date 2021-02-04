@@ -1,4 +1,4 @@
-#!/bin/rc -i
+#!/bin/rc
 
 fn sighup {
 	@{echo hangup > /proc/$catpid/note}

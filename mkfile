@@ -1,8 +1,7 @@
 </$objtype/mkfile
 
-TARG=irccloudfs irccloud
+TARG=irccloudfs
 BIN=$home/bin/$objtype
-RCBIN=$home/bin/rc
 
 FSFILES=\
 	net.$O\
@@ -13,12 +12,3 @@ FSFILES=\
 
 $O.irccloudfs: $FSFILES
 	$LD -o $target $prereq
-
-irccloud.install: $O.irccloud
-	cp $O.irccloud $RCBIN/irccloud
-
-$O.irccloud: irccloud.$O
-	cp irccloud.$O $O.irccloud
-
-irccloud.$O: irccloud.rc
-	cp irccloud.rc irccloud.$O
