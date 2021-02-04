@@ -223,6 +223,8 @@ parsestream(JSON *json)
 	char *msg;
 	char *tmp;
 
+//	print("%J\n", json);
+
 	jsonm = jsonbyname(json, "eid");
 	if (jsonm != nil && jsonm->n > 0)
 		sinceid = (vlong)jsonm->n;
@@ -331,7 +333,7 @@ parsestream(JSON *json)
 			sysfatal("jsonbyname(topic): %r");
 		if (buffer->topic != nil)
 			free(buffer->topic);
-		buffer->topic = smprint("%s %c%s\ntopic set at %d by %s:\n%s\n", jsonm->s, buffer->mode == nil || buffer->mode[0] == '\0'? ' ': '+', buffer->mode == nil? "": buffer->mode, (ulong)jsonm3->n, jsonm4->s, jsonm5->s);
+		buffer->topic = smprint("%s %c%s\ntopic set at %lu by %s:\n%s\n", jsonm->s, buffer->mode == nil || buffer->mode[0] == '\0'? ' ': '+', buffer->mode == nil? "": buffer->mode, (ulong)jsonm3->n, jsonm4->s, jsonm5->s);
 	}
 	else if (strcmp(jsonm->s, "channel_init") == 0) {
 		jsonm = jsonbyname(json, "bid");
@@ -363,7 +365,7 @@ parsestream(JSON *json)
 			sysfatal("jsonbyname(text): %r");
 		if (buffer->topic != nil)
 			free(buffer->topic);
-		buffer->topic = smprint("%s %c%s\ntopic set at %d by %s:\n%s\n", buffer->name, buffer->mode[0] == '\0'? ' ': '+', buffer->mode, (ulong)jsonm3->n, jsonm4->s, jsonm5->s);
+		buffer->topic = smprint("%s %c%s\ntopic set at %lu by %s:\n%s\n", buffer->name, buffer->mode[0] == '\0'? ' ': '+', buffer->mode, (ulong)jsonm3->n, jsonm4->s, jsonm5->s);
 
 		jsonm2 = jsonbyname(json, "members");
 		if (jsonm2 == nil)
@@ -590,10 +592,14 @@ parsestream(JSON *json)
 		jsonm5 = jsonbyname(json, "oldnick");
 		if (jsonm5 == nil)
 			sysfatal("jsonbyname(oldnick): %r");
+		if (jsonstr(jsonm5) == nil)
+			return;
 
 		jsonm2 = jsonbyname(json, "newnick");
 		if (jsonm2 == nil)
 			sysfatal("jsonbyname(newnick): %r");
+		if (jsonstr(jsonm2) == nil)
+			return;
 
 		if (strcmp(jsonm->s, "you_nickchange") == 0) {
 			free(server->nick);
@@ -611,8 +617,10 @@ parsestream(JSON *json)
 		}
 
 		if (strcmp(buffer->name, jsonm5->s) == 0) {
+			free(buffer->name);
+			buffer->name = strdup(jsonm2->s);
 			free(buffer->f->name);
-			buffer->f->name = strdup(jsonm5->s);
+			buffer->f->name = strdup(jsonm2->s);
 		}
 
 		msg = smprint("NICK %s → %s\n", jsonm5->s, jsonm2->s);
@@ -708,8 +716,6 @@ parsestream(JSON *json)
 		msg = smprint("MODE %s %s %s\n", jsonm4->s, jsonm3->s, jsonm->s);
 		writebuffer(buffer, msg, timestamp);
 		free(msg);
-	} else {
-		print("%J\n", json);
 	}
 }
 
@@ -718,14 +724,10 @@ readbacklog(char *path)
 {
 	char *url;
 	int fd;
-	Biobuf *stream;
-	char *line;
-	char *tmp = nil;
 	char **headers;
-	int l;
 	JSON *json, *jsonm;
 	JSONEl *next;
-	struct Buffer *buffer;
+	char *tmp;
 
 	headers = calloc(2, sizeof(char*));
 	headers[0] = smprint("Cookie: session=%s", session);
@@ -753,13 +755,13 @@ readbacklog(char *path)
 }
 
 void
-readstream(void *unused)
+readstream(void*)
 {
-	JSON *json, *jsonm;
-	char *buf;
+	JSON *json;
 	int fd;
 	char **headers;
 	char *tmp;
+	char *buf;
 	int l;
 	Biobuf *stream;
 	streamid = nil;
@@ -850,7 +852,7 @@ say(vlong cid, char *to, char *data, unsigned long count)
 		close(pfd[0]);
 
 		if (strlen(tmp) > 0) {
-			postdata = smprint("cid=%d&to=%s&msg=%s&token=%s&session=%s", cid, to, tmp, token, session);
+			postdata = smprint("cid=%d&to=%s&msg=%s&token=%s&session=%s", (int)cid, to, tmp, token, session);
 
 			fd = openurl(SAYURL, headers, 1, postdata, nil);
 			close(fd);

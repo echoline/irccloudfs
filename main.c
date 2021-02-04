@@ -9,10 +9,9 @@
 #include "fns.h"
 
 void
-threadmain(int argc, char **argv)
+threadmain(int, char**)
 {
 	UserPasswd *up;
-	int r;
 
 	up = auth_getuserpasswd(auth_getkey, "proto=pass service=irccloud");
 	if (up == nil)
