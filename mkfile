@@ -1,7 +1,7 @@
 </$objtype/mkfile
 
 TARG=irccloudfs irccloud
-BIN=/$objtype/bin
+BIN=$home/bin/$objtype
 
 FSFILES=\
 	net.$O\
