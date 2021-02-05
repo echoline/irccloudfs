@@ -223,7 +223,7 @@ parsestream(JSON *json)
 	char *msg;
 	char *tmp;
 
-//	print("%J\n", json);
+	print("%J\n", json);
 
 	jsonm = jsonbyname(json, "eid");
 	if (jsonm != nil && jsonm->n > 0)

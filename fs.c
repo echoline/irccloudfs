@@ -210,6 +210,7 @@ allocbuffer(JSON *json)
 	vlong bid;
 	struct IRCServer *server;
 	struct Buffer *buffer;
+	struct Buffer *buffer2;
 	int timeout = 0;
 	int deferred = 0;
 	char *type;
@@ -256,13 +257,16 @@ allocbuffer(JSON *json)
 		buffer = buffers;
 	} else {
 		buffer = buffers;
-		while (buffer->next != 0) {
+		buffer2 = buffer;
+		while (buffer != nil) {
 			if (buffer->bid == bid)
 				return;
 			if (strcmp(buffer->name, name) == 0)
 				return;
+			buffer2 = buffer;
 			buffer = buffer->next;
 		}
+		buffer = buffer2;
 
 		buffer->next = calloc(1, sizeof(struct Buffer));
 		buffer = buffer->next;
@@ -277,7 +281,8 @@ allocbuffer(JSON *json)
 	buffer->server = server;
 	buffer->f = createfile(server->f, name, nil, DMDIR|0777, server);
 	buffer->dataf = createfile(buffer->f, "data", nil, 0666, buffer);
-	buffer->data = calloc(1, 1);
+	buffer->data = smprint("%s:%lld - %s:%lld\n", server->f->name, cid, name, bid);
+	buffer->length = strlen(buffer->data);
 	buffer->reqchan = chancreate(sizeof(Req*), 16);
 	if (strcmp(type, "channel") == 0) {
 		buffer->topicf = createfile(buffer->f, "topic", nil, 0444, buffer);
